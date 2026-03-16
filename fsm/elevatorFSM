@@ -1,0 +1,67 @@
+/*
+Q5: Elevator FSM Logic Suppose you are designing the elevator for a 4-story building.
+
+What inputs do you need to track? 
+
+If the elevator is at Floor 2 and both the "Floor 1" and "Floor 4" buttons are pressed simultaneously, 
+how do you decide which way to go? (NVIDIA is looking for your Priority Logic or Scheduling Algorithm here)
+*/
+
+module elevator_controller (
+    input  logic       clk,
+    input  logic       resetn,
+    input  logic [3:0] floor_requests, // Bit [i] is high if floor i is requested
+    output logic [1:0] current_floor,
+    output logic       door_open
+);
+
+    typedef enum logic [1:0] {IDLE, MOVING_UP, MOVING_DOWN, OPEN_DOOR} state_t;
+    state_t state, next_state;
+    
+    logic [1:0] target_floor;
+    logic [3:0] pending_requests;
+
+    // FSM Sequential Logic
+    always_ff @(posedge clk) begin
+        if (!resetn) begin
+            state <= IDLE;
+            current_floor <= 2'd0;
+            pending_requests <= 4'b0;
+        end else begin
+            state <= next_state;
+            // Latch new requests into our internal mask
+            pending_requests <= (pending_requests | floor_requests);
+            
+            if (state == OPEN_DOOR) begin
+                // Clear the request once we arrive and open the door
+                pending_requests[current_floor] <= 1'b0;
+            end else if (state == MOVING_UP) begin
+                current_floor <= current_floor + 1;
+            end else if (state == MOVING_DOWN) begin
+                current_floor <= current_floor - 1;
+            end
+        end
+    end
+
+    // Next State Logic (Priority Logic)
+    always_comb begin
+        next_state = state;
+        case (state)
+            IDLE: begin
+                if (pending_requests != 4'b0) begin
+                    if (pending_requests[current_floor]) next_state = OPEN_DOOR;
+                    // Priority Logic: Check if any requests are above us
+                    else if (pending_requests > (1 << current_floor)) next_state = MOVING_UP;
+                    else next_state = MOVING_DOWN;
+                end
+            end
+            MOVING_UP, MOVING_DOWN: begin
+                // Check if we reached a requested floor
+                if (pending_requests[current_floor]) next_state = OPEN_DOOR;
+            end
+            OPEN_DOOR: begin
+                next_state = IDLE; // Simple 1-cycle door open for this model
+            end
+        endcase
+    end
+endmodule

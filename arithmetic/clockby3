@@ -1,0 +1,35 @@
+/*
+Clock Division (The Divide-by-3) Design a Verilog module that takes a clock and outputs a clock with exactly 1/3 the frequency.
+Constraint: The output clock must have a 50% duty cycle.
+
+Note: This is a famous "Medium" difficulty question because dividing by an odd number 
+with a 50% duty cycle requires using both the rising and falling edges of the input clock.
+*/
+
+module clock_div_by_3 (
+    input clk, resetn,
+    output logic dout
+);
+    logic [1:0] count;
+    logic pos_q, neg_q;
+
+    // Counter 0-1-2
+    always_ff @(posedge clk) begin
+        if (!resetn) count <= 0;
+        else count <= (count == 2) ? 0 : count + 1;
+    end
+
+    // High for 2 cycles, Low for 1 (Posedge)
+    always_ff @(posedge clk) begin
+        if (!resetn) pos_q <= 0;
+        else pos_q <= (count == 0 || count == 1);
+    end
+
+    // Same logic on Negedge
+    always_ff @(negedge clk) begin
+        if (!resetn) neg_q <= 0;
+        else neg_q <= (count == 0 || count == 1);
+    end
+
+    assign dout = pos_q & neg_q; // 50% duty cycle result
+endmodule
